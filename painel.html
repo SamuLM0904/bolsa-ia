@@ -25,6 +25,7 @@
   .ev.usado { opacity:.45; }
   input { width:100%; padding:9px; border-radius:8px; border:1px solid var(--line); background:#0f151d; color:var(--txt); margin-bottom:6px; font-size:14px; }
   .mini button { padding:5px 8px; font-size:12px; margin:1px; }
+  .hidden { display:none; }
   .efx .lin { padding:6px 0; border-bottom:1px solid var(--line); }
   .efx .top { display:flex; justify-content:space-between; font-size:14px; }
   .efx .top b.val { min-width:56px; text-align:right; }
@@ -55,6 +56,12 @@
     <button class="b" onclick="toggle('qr')">QR Code grande: <span id="qrSt">-</span></button>
     <button class="b" onclick="toggle('final')">Resultado final: <span id="finalSt">-</span></button>
     <button class="y" onclick="dividendos()">💰 Pagar dividendos (3%)</button>
+    <div><button class="b" onclick="toggleJog()">👥 <span id="jogBtn">Mostrar jogadores</span></button></div>
+    <div id="listaJog" class="hidden">
+      <table id="tabJog" style="margin-top:8px"></table>
+      <h2 style="margin-top:12px">Removidos</h2>
+      <table id="tabExp"></table>
+    </div>
   </div>
 
   <div class="card">
@@ -131,6 +138,8 @@ function mostrarCustom(t) {
   el.className = "val " + (v > 0 ? "up" : v < 0 ? "down" : "mut");
 }
 db.ref("jogadores").on("value", s => { jogadores = s.val() || {}; renderRank(); });
+let expulsos = {}, verJog = false;
+db.ref("expulsos").on("value", s => { expulsos = s.val() || {}; renderJog(); });
 
 setInterval(() => {
   const p = estado.pregao || {};
@@ -177,6 +186,28 @@ function renderRank() {
     h += "<tr><td>" + (i + 1) + "</td><td>" + esc(j.nome) + "</td><td>" + fmt(j.p) + '</td><td class="' + (l >= 0 ? "up" : "down") + '">' + pct(l) + "</td></tr>";
   });
   document.getElementById("tabRank").innerHTML = h;
+  renderJog();
+}
+
+// lista de jogadores (ordem alfabética) com botão para remover da sala
+function toggleJog() { verJog = !verJog; renderJog(); }
+function renderJog() {
+  document.getElementById("listaJog").classList.toggle("hidden", !verJog);
+  document.getElementById("jogBtn").textContent = (verJog ? "Esconder" : "Mostrar") + " jogadores (" + Object.keys(jogadores).length + ")";
+  if (!verJog) return;
+  const lista = Object.entries(jogadores).map(([id, j]) => ({ id, nome: j.nome, p: patrimonio(j, acoes) }))
+    .sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"));
+  let h = "<tr><th>Nome</th><th>Patrimônio</th><th></th></tr>";
+  lista.forEach(j => {
+    h += "<tr><td>" + esc(j.nome) + "</td><td>" + fmt(j.p) + '</td><td class="mini"><button class="b" data-id="' + esc(j.id) + '" onclick="renomear(this.dataset.id)">Renomear</button>' +
+      '<button class="r" data-id="' + esc(j.id) + '" onclick="expulsar(this.dataset.id)">Remover</button></td></tr>';
+  });
+  if (!lista.length) h += '<tr><td colspan="3" class="mut">Ninguém entrou ainda.</td></tr>';
+  document.getElementById("tabJog").innerHTML = h;
+  const exp = Object.entries(expulsos);
+  document.getElementById("tabExp").innerHTML = exp.length
+    ? exp.map(([id, nome]) => "<tr><td>" + esc(nome) + '</td><td class="mini"><button class="g" data-id="' + esc(id) + '" onclick="readmitir(this.dataset.id)">Deixar voltar</button></td></tr>').join("")
+    : '<tr><td class="mut">Ninguém foi removido.</td></tr>';
 }
 function esc(s) { return String(s || "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 
@@ -193,11 +224,16 @@ async function aplicar(efeitos) {
     db.ref("acoes/" + t + "/preco").transaction(p => p === null ? undefined : Math.max(1, r2(p * (1 + v / 100))))
   ));
 }
+// publica a notícia atual e guarda no histórico da sessão (lista no celular dos alunos)
+function publicar(n) {
+  db.ref("estado/noticia").set(n);
+  db.ref("historico").push(n);
+}
 async function evento(i) {
   const e = EVENTOS[i];
   if (!confirm("Disparar: " + e.titulo + "?")) return;
   await aplicar(e.efeitos);
-  db.ref("estado/noticia").set({ titulo: e.titulo, texto: e.texto, efeitos: e.efeitos, ts: agora() });
+  publicar({ titulo: e.titulo, texto: e.texto, efeitos: e.efeitos, ts: agora() });
   db.ref("estado/usados/" + e.id).set(true);
 }
 function mexer(t, v) { aplicar({ [t]: v }); }
@@ -213,7 +249,7 @@ async function eventoCustom() {
   const resumo = Object.entries(efeitos).map(([t, v]) => t + " " + (v > 0 ? "+" : "") + v + "%").join(", ");
   if (!confirm("Disparar: " + titulo + "?\n" + resumo)) return;
   await aplicar(efeitos);
-  db.ref("estado/noticia").set({ titulo, texto: document.getElementById("cx").value.trim(), efeitos, ts: agora() });
+  publicar({ titulo, texto: document.getElementById("cx").value.trim(), efeitos, ts: agora() });
   limparCustom();
 }
 function limparCustom() {
@@ -222,7 +258,7 @@ function limparCustom() {
 }
 function noticiaLivre() {
   const titulo = document.getElementById("nt").value.trim(); if (!titulo) return;
-  db.ref("estado/noticia").set({ titulo, texto: document.getElementById("nx").value.trim(), ts: agora() });
+  publicar({ titulo, texto: document.getElementById("nx").value.trim(), ts: agora() });
   document.getElementById("nt").value = ""; document.getElementById("nx").value = "";
 }
 async function dividendos() {
@@ -235,15 +271,33 @@ async function dividendos() {
     if (!d) return null;
     return db.ref("jogadores/" + id + "/caixa").transaction(x => r2((x || 0) + d));
   }));
-  db.ref("estado/noticia").set({ titulo: "💰 Dividendos pagos!", texto: "Quem tem ação recebeu 3% do valor em dinheiro.", ts: agora() });
+  publicar({ titulo: "💰 Dividendos pagos!", texto: "Quem tem ação recebeu 3% do valor em dinheiro.", ts: agora() });
   alert("Pago: " + fmt(total));
 }
+function expulsar(id) {
+  const j = jogadores[id]; if (!j) return;
+  if (!confirm("Remover " + (j.nome || "este jogador") + " da sala?\nA pessoa perde tudo e não consegue entrar de novo até você deixar voltar.")) return;
+  db.ref().update({ ["jogadores/" + id]: null, ["expulsos/" + id]: j.nome || "?" });
+}
+// troca o nome sem avisar o jogador (só muda no celular, ranking e telão)
+function renomear(id) {
+  const j = jogadores[id]; if (!j) return;
+  const novo = prompt("Novo nome para " + (j.nome || "este jogador") + ":", j.nome || "");
+  if (novo === null) return;
+  const nome = novo.trim().slice(0, 18);
+  if (nome.length < 2) return alert("Nome muito curto.");
+  db.ref("jogadores/" + id).transaction(x => {
+    if (x === null) return; // aborta: jogador saiu
+    x.nome = nome; return x;
+  });
+}
+function readmitir(id) { db.ref("expulsos/" + id).remove(); }
 function resetar() {
   if (prompt("Isso apaga TUDO. Digite RESET para confirmar") !== "RESET") return;
   const novas = {};
   for (const t of TICKERS) novas[t] = { preco: ACOES[t].preco, base: ACOES[t].preco };
   db.ref().update({
-    acoes: novas, jogadores: null, rodadas: null,
+    acoes: novas, jogadores: null, rodadas: null, historico: null, expulsos: null,
     estado: { pregao: { aberto: false, fimEm: 0, rodada: 0 }, qr: true, final: false, noticia: null, usados: null }
   });
 }

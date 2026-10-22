@@ -5,25 +5,49 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Bolsa da IA</title>
 <style>
-  :root { --bg:#0b0f14; --card:#141b24; --line:#223042; --txt:#e6edf3; --mut:#8b9bb0; --up:#22c55e; --down:#ef4444; --acc:#facc15; }
+  :root { --bg:#0b0f14; --card:#141b24; --line:#223042; --txt:#e6edf3; --mut:#8b9bb0; --up:#22c55e; --down:#ef4444; --acc:#facc15;
+    --inp:#0f151d; --font:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; color-scheme:dark; }
+  /* temas escolhidos em ⚙️ Configurações (salvos no localStorage) */
+  html[data-tema="claro"] { --bg:#f2f4f7; --card:#ffffff; --line:#d5dce5; --txt:#0f172a; --mut:#5b6b80; --up:#15803d; --down:#dc2626; --acc:#d97706; --inp:#f8fafc; color-scheme:light; }
+  html[data-tema="wall"] { --bg:#0a0f1e; --card:#121a2e; --line:#2c3757; --txt:#f3efe3; --mut:#a3abbf; --up:#34d399; --down:#f87171; --acc:#d4af37; --inp:#0c1324;
+    --font:Georgia,"Times New Roman",serif; }
+  html[data-tema="terminal"] { --bg:#000000; --card:#041004; --line:#145214; --txt:#b6ffb6; --mut:#5fbf5f; --up:#39ff14; --down:#ff5c5c; --acc:#39ff14; --inp:#000000;
+    --font:Consolas,"Courier New",monospace; }
   * { box-sizing:border-box; margin:0; padding:0; }
-  body { background:var(--bg); color:var(--txt); font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; padding:12px 12px 90px; }
+  body { background:var(--bg); color:var(--txt); font-family:var(--font); padding:12px 12px 90px; }
   h1 { font-size:20px; letter-spacing:1px; }
   h1 span { color:var(--acc); }
   .mut { color:var(--mut); font-size:13px; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; margin-top:10px; }
-  input { width:100%; padding:14px; border-radius:10px; border:1px solid var(--line); background:#0f151d; color:var(--txt); font-size:17px; margin-top:10px; }
-  button { border:0; border-radius:10px; font-weight:700; font-size:15px; padding:11px 14px; cursor:pointer; }
+  input { width:100%; padding:14px; border-radius:10px; border:1px solid var(--line); background:var(--inp); color:var(--txt); font-size:17px; margin-top:10px; font-family:inherit; }
+  button { border:0; border-radius:10px; font-weight:700; font-size:15px; padding:11px 14px; cursor:pointer; font-family:inherit; }
   button:disabled { opacity:.3; }
   .big { width:100%; background:var(--acc); color:#000; font-size:17px; padding:14px; margin-top:10px; }
   .top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
-  .saldo { text-align:right; }
-  .saldo b { font-size:18px; display:block; }
+  .titulo { text-align:center; font-size:28px; margin:4px 0 10px; }
+  .head { display:flex; gap:10px; align-items:stretch; }
+  .head .saldo { flex:1; margin-top:0; padding:10px 12px; }
+  .saldo .linha { display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-top:4px; }
+  .saldo b { font-size:18px; }
   .status { position:sticky; top:0; z-index:5; margin:10px -12px 0; padding:10px 12px; font-weight:800; text-align:center; font-size:15px; }
   .aberto { background:#14532d; color:#bbf7d0; }
   .fechado { background:#3f1d1d; color:#fecaca; }
   .news { border-color:var(--acc); }
   .news b { color:var(--acc); display:block; font-size:16px; margin-bottom:3px; }
+  .news .hh { color:var(--acc); font-weight:800; font-size:15px; margin-bottom:4px; }
+  .hist { max-height:42vh; overflow-y:auto; }
+  .hi { border-top:1px solid var(--line); padding:8px 0; }
+  .hi:first-child { border-top:0; }
+  .hi summary { list-style:none; display:flex; gap:8px; align-items:flex-start; cursor:pointer; }
+  .hi summary::-webkit-details-marker { display:none; }
+  .hi .dot { width:12px; height:12px; border-radius:50%; flex:none; margin-top:4px; }
+  .hi .tt { flex:1; font-weight:700; font-size:15px; }
+  .hi .seta { color:var(--mut); transition:transform .2s; }
+  .hi[open] .seta { transform:rotate(90deg); }
+  .hi .tx { font-weight:400; font-size:13px; color:var(--mut); margin-top:2px; }
+  .hi > .tx, .hi .efs { padding-left:20px; }
+  .hi .efs { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+  .hi .ef { font-size:13px; font-weight:700; padding:3px 7px; border-radius:6px; background:var(--inp); }
   .acao { display:grid; grid-template-columns:1fr auto; gap:6px 10px; align-items:center; }
   .acao .nome { font-weight:800; font-size:16px; }
   .acao .preco { text-align:right; font-weight:800; font-size:16px; }
@@ -33,28 +57,46 @@
   .tenho { grid-column:1 / -1; font-size:13px; color:var(--mut); }
   .tenho b { color:var(--txt); }
   .rod { grid-column:1 / -1; font-size:12px; color:var(--acc); }
-  #toast { position:fixed; left:12px; right:12px; bottom:16px; background:#1f2937; border:1px solid var(--acc); padding:14px; border-radius:12px; text-align:center; font-weight:700; display:none; z-index:20; }
-  #flash { position:fixed; inset:0; background:var(--acc); opacity:0; pointer-events:none; transition:opacity .4s; z-index:15; }
+  #toast { position:fixed; left:12px; right:12px; bottom:16px; background:var(--card); border:1px solid var(--acc); padding:14px; border-radius:12px; text-align:center; font-weight:700; display:none; z-index:20; }
+  #flash { position:fixed; inset:0; background:var(--acc); opacity:0; pointer-events:none; transition:opacity .7s ease; z-index:15; }
   .final { text-align:center; padding:24px 12px; }
   .final .pos { font-size:56px; font-weight:900; color:var(--acc); }
+  .cfgBtn { background:var(--card); border:1px solid var(--line); border-radius:14px; color:var(--txt); font-size:28px; padding:0 16px; }
+  .modal { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:30; display:flex; align-items:center; justify-content:center; padding:12px; }
+  .sheet { width:100%; max-width:420px; margin:0; max-height:90vh; overflow-y:auto; }
+  .sheet h2 { font-size:18px; }
+  .sheet .x { background:transparent; color:var(--mut); font-size:18px; padding:2px 8px; }
+  .sheet .lbl { margin-top:14px; font-weight:700; }
+  .temas { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px; }
+  .tema { border:2px solid #333; padding:14px 8px; font-size:15px; }
+  .tema.sel { outline:3px solid var(--acc); outline-offset:2px; }
+  .sairBtn { background:#7f1d1d; color:#fff; margin-top:18px; }
+  .aviso { border-color:var(--down); }
   .hidden { display:none; }
 </style>
+<script>try { const t = localStorage.getItem("bolsaTema"); if (t && t !== "escuro") document.documentElement.dataset.tema = t; } catch (e) {}</script>
 </head>
 <body>
 
 <div id="telaEntrar">
   <h1>📈 BOLSA DA <span>IA</span></h1>
   <p class="mut" style="margin-top:6px">Você começa com IA$ 1.000. Compre e venda ações das empresas de IA. Preste atenção na apresentação: cada notícia mexe no mercado.</p>
-  <div class="card">
+  <div id="expulsoMsg" class="card aviso hidden">🚫 Você foi removido da sala pelo organizador.</div>
+  <div class="card" id="cardEntrar">
     <input id="nome" maxlength="18" placeholder="Seu nome (ou apelido)" autocomplete="off">
     <button class="big" onclick="entrar()">ENTRAR NA BOLSA</button>
   </div>
 </div>
 
 <div id="telaJogo" class="hidden">
-  <div class="top">
-    <div><h1>📈 BOLSA DA <span>IA</span></h1><div class="mut" id="eu"></div></div>
-    <div class="saldo"><span class="mut">Caixa</span><b id="caixa">-</b><span class="mut">Patrimônio </span><span id="patri">-</span></div>
+  <h1 class="titulo">📈 BOLSA DA <span>IA</span></h1>
+  <div class="head">
+    <div class="card saldo">
+      <div class="mut" id="eu"></div>
+      <div class="linha"><span class="mut">Caixa</span><b id="caixa">-</b></div>
+      <div class="linha"><span class="mut">Patrimônio</span><span id="patri">-</span></div>
+    </div>
+    <button class="cfgBtn" onclick="abrirCfg()" aria-label="Configurações">⚙️</button>
   </div>
   <div id="status" class="status fechado">🔒 PREGÃO FECHADO</div>
   <div id="noticia" class="card news hidden"></div>
@@ -66,6 +108,18 @@
   <div class="pos" id="fPos">-</div>
   <div class="mut">sua posição no ranking</div>
   <div class="card"><div class="mut">Patrimônio final</div><b id="fPatri" style="font-size:24px">-</b><div id="fLucro"></div></div>
+</div>
+
+<div id="cfg" class="modal hidden" onclick="if (event.target === this) fecharCfg()">
+  <div class="card sheet">
+    <div class="top"><h2>⚙️ Configurações</h2><button class="x" onclick="fecharCfg()" aria-label="Fechar">✕</button></div>
+    <div class="mut lbl">Tema</div>
+    <div class="temas" id="temas"></div>
+    <div class="mut lbl">Seu nome</div>
+    <input id="novoNome" maxlength="18" autocomplete="off">
+    <button class="big" onclick="trocarNome()">Salvar nome</button>
+    <button class="big sairBtn" onclick="sair()">🚪 Sair do jogo</button>
+  </div>
 </div>
 
 <div id="toast"></div>
@@ -101,26 +155,78 @@ function corEvento(efeitos) {
 }
 function flash(cor) {
   const f = document.getElementById("flash");
-  f.style.background = cor || "var(--acc)";
-  f.style.opacity = .6; setTimeout(() => f.style.opacity = 0, 700);
+  // brilho suave vindo das bordas, centro transparente
+  f.style.background = "radial-gradient(ellipse at center, transparent 35%, " + (cor || "#facc15") + " 120%)";
+  f.style.opacity = .7; setTimeout(() => f.style.opacity = 0, 900);
   try { navigator.vibrate && navigator.vibrate([150, 80, 150]); } catch (e) {}
 }
 
 function entrar() {
+  if (expulso) return toast("Você foi removido da sala");
   const nome = document.getElementById("nome").value.trim();
   if (nome.length < 2) return toast("Digite seu nome");
   db.ref("jogadores/" + meuId).set({ nome, caixa: CAIXA_INICIAL, carteira: {}, entrou: agora() });
 }
 
+// ----- configurações -----
+const TEMAS = [
+  { id: "escuro",   nome: "Escuro",      bg: "#0b0f14", cor: "#facc15", font: "system-ui,sans-serif" },
+  { id: "claro",    nome: "Claro",       bg: "#f2f4f7", cor: "#d97706", font: "system-ui,sans-serif" },
+  { id: "wall",     nome: "Wall Street", bg: "#0a0f1e", cor: "#d4af37", font: "Georgia,serif" },
+  { id: "terminal", nome: "Terminal",    bg: "#000000", cor: "#39ff14", font: "Consolas,monospace" }
+];
+function renderTemas() {
+  const atual = document.documentElement.dataset.tema || "escuro";
+  document.getElementById("temas").innerHTML = TEMAS.map(t =>
+    '<button class="tema' + (t.id === atual ? " sel" : "") + '" style="background:' + t.bg + ";color:" + t.cor + ";font-family:" + t.font + '" onclick="aplicarTema(\'' + t.id + '\')">' + t.nome + "</button>").join("");
+}
+function aplicarTema(id) {
+  if (id === "escuro") delete document.documentElement.dataset.tema; else document.documentElement.dataset.tema = id;
+  try { localStorage.setItem("bolsaTema", id); } catch (e) {}
+  renderTemas();
+}
+function abrirCfg() {
+  document.getElementById("novoNome").value = eu ? eu.nome : "";
+  renderTemas();
+  document.getElementById("cfg").classList.remove("hidden");
+}
+function fecharCfg() { document.getElementById("cfg").classList.add("hidden"); }
+async function trocarNome() {
+  const nome = document.getElementById("novoNome").value.trim();
+  if (nome.length < 2) return toast("Digite seu nome");
+  const r = await db.ref("jogadores/" + meuId).transaction(j => {
+    if (j === null) return; // aborta: jogador não existe mais
+    j.nome = nome; return j;
+  });
+  fecharCfg();
+  toast(r.committed ? "Nome alterado" : "Não foi possível trocar o nome");
+}
+function sair() {
+  if (!confirm("Sair do jogo? Seu dinheiro e suas ações serão apagados.")) return;
+  fecharCfg();
+  db.ref("jogadores/" + meuId).remove();
+}
+
 // ----- ouvintes -----
+let expulso = false;
+db.ref("expulsos/" + meuId).on("value", s => {
+  expulso = !!s.val();
+  document.getElementById("expulsoMsg").classList.toggle("hidden", !expulso);
+  document.getElementById("cardEntrar").classList.toggle("hidden", expulso);
+});
 db.ref("jogadores/" + meuId).on("value", s => {
   eu = s.val();
+  if (!eu) fecharCfg();
   document.getElementById("telaEntrar").classList.toggle("hidden", !!eu);
   document.getElementById("telaJogo").classList.toggle("hidden", !eu || (estado && estado.final));
+  document.getElementById("telaFinal").classList.toggle("hidden", !(estado && estado.final) || !eu);
   render();
 });
 db.ref("acoes").on("value", s => { acoes = s.val() || {}; render(); });
 db.ref("jogadores").on("value", s => { todos = s.val() || {}; renderFinal(); });
+let historico = [];
+const abertos = {}; // notícias expandidas (por ts), para não fecharem quando a lista redesenha
+db.ref("historico").on("value", s => { historico = Object.values(s.val() || {}).sort((a, b) => (b.ts || 0) - (a.ts || 0)); renderHist(); });
 db.ref("estado").on("value", s => {
   estado = s.val() || {};
   const n = estado.noticia;
@@ -129,7 +235,7 @@ db.ref("estado").on("value", s => {
   db.ref("rodadas/" + rod).once("value", r => { rodadaStats = r.val() || {}; render(); });
   document.getElementById("telaJogo").classList.toggle("hidden", !eu || !!estado.final);
   document.getElementById("telaFinal").classList.toggle("hidden", !estado.final || !eu);
-  render(); renderFinal();
+  render(); renderFinal(); renderHist();
 });
 setInterval(renderStatus, 500);
 
@@ -148,16 +254,11 @@ function renderStatus() {
 
 function render() {
   if (!eu) return;
-  document.getElementById("eu").textContent = eu.nome;
+  document.getElementById("eu").textContent = "👤 " + eu.nome;
   document.getElementById("caixa").textContent = fmt(eu.caixa);
   const pt = patrimonio(eu, acoes);
   const luc = (pt / CAIXA_INICIAL - 1) * 100;
   document.getElementById("patri").innerHTML = fmt(pt) + ' <span class="' + (luc >= 0 ? "up" : "down") + '">' + pct(luc) + "</span>";
-
-  const n = estado.noticia;
-  const nEl = document.getElementById("noticia");
-  if (n) { nEl.classList.remove("hidden"); nEl.innerHTML = "<b>📰 " + esc(n.titulo) + "</b>" + esc(n.texto || ""); }
-  else nEl.classList.add("hidden");
 
   const aberto = pregaoAberto(estado);
   const cart = eu.carteira || {};
@@ -182,6 +283,25 @@ function render() {
   }
   document.getElementById("lista").innerHTML = html;
   renderStatus();
+}
+
+// lista de notícias da sessão: mais nova no topo, toque para ver o que mudou nos preços
+function renderHist() {
+  const lista = historico.length ? historico : (estado.noticia ? [estado.noticia] : []);
+  const nEl = document.getElementById("noticia");
+  if (!lista.length) { nEl.classList.add("hidden"); return; }
+  nEl.classList.remove("hidden");
+  nEl.innerHTML = '<div class="hh">📰 Notícias da sessão (' + lista.length + ')</div><div class="hist">' + lista.map((n, i) => {
+    const ef = n.efeitos || {};
+    const tk = TICKERS.filter(t => ef[t]);
+    const efs = tk.length
+      ? tk.map(t => '<span class="ef ' + (ef[t] > 0 ? "up" : "down") + '">' + ACOES[t].flag + " " + t + " " + (ef[t] > 0 ? "+" : "") + ef[t] + "%</span>").join("")
+      : '<span class="mut">Sem efeito nos preços.</span>';
+    const tx = n.texto ? '<div class="tx">' + esc(n.texto) + "</div>" : "";
+    return '<details class="hi"' + (abertos[n.ts] ? " open" : "") + ' ontoggle="abertos[' + Number(n.ts) + ']=this.open">' +
+      '<summary><span class="dot" style="background:' + corEvento(n.efeitos) + '"></span><span class="tt">' + esc(n.titulo || "") + (i === 0 ? tx : "") + "</span>" +
+      '<span class="seta">▸</span></summary>' + (i ? tx : "") + '<div class="efs">' + efs + "</div></details>";
+  }).join("") + "</div>";
 }
 
 function renderFinal() {
