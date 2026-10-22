@@ -80,7 +80,7 @@
 
 <div id="telaEntrar">
   <h1>📈 BOLSA DA <span>IA</span></h1>
-  <p class="mut" style="margin-top:6px">Você começa com IA$ 1.000. Compre e venda ações das empresas de IA. Preste atenção na apresentação: cada notícia mexe no mercado.</p>
+  <p class="mut" style="margin-top:6px">Você começa com IA$ 1.000. Compre e venda ações das empresas de IA. Preste atenção na apresentação: cada notícia mexe no mercado. Ao fim de cada pregão, suas ações pagam dividendos.</p>
   <div id="expulsoMsg" class="card aviso hidden">🚫 Você foi removido da sala pelo organizador.</div>
   <div class="card" id="cardEntrar">
     <input id="nome" maxlength="18" placeholder="Seu nome (ou apelido)" autocomplete="off">
@@ -152,6 +152,13 @@ function corEvento(efeitos) {
   const k = (Math.abs(x) - 0.1) / 0.9;
   const hue = x < 0 ? 40 - 40 * k : 75 + 55 * k;
   return "hsl(" + hue.toFixed(0) + ",90%,50%)";
+}
+function corNoticia(n) { return n.div ? "hsl(110,90%,50%)" : corEvento(n.efeitos); } // dividendos = verde
+// quanto a minha carteira rende de dividendos agora (mesma conta do painel)
+function meusDividendos() {
+  let d = 0; const c = (eu && eu.carteira) || {};
+  for (const t in c) d += (c[t] || 0) * ((acoes[t] && acoes[t].preco) || 0) * ((ACOES[t] && ACOES[t].div) || 0);
+  return r2(d);
 }
 function flash(cor) {
   const f = document.getElementById("flash");
@@ -230,7 +237,13 @@ db.ref("historico").on("value", s => { historico = Object.values(s.val() || {}).
 db.ref("estado").on("value", s => {
   estado = s.val() || {};
   const n = estado.noticia;
-  if (n && n.ts && n.ts !== ultimaNoticia) { if (ultimaNoticia) flash(corEvento(n.efeitos)); ultimaNoticia = n.ts; }
+  if (n && n.ts && n.ts !== ultimaNoticia) {
+    if (ultimaNoticia) {
+      flash(corNoticia(n));
+      if (n.div && meusDividendos()) toast("💰 Você recebeu " + fmt(meusDividendos()) + " de dividendos");
+    }
+    ultimaNoticia = n.ts;
+  }
   const rod = estado.pregao ? estado.pregao.rodada : 0;
   db.ref("rodadas/" + rod).once("value", r => { rodadaStats = r.val() || {}; render(); });
   document.getElementById("telaJogo").classList.toggle("hidden", !eu || !!estado.final);
@@ -270,9 +283,9 @@ function render() {
     const qtd = cart[t] || 0;
     const st = rodadaStats[t] || {};
     html += '<div class="card acao">' +
-      '<div><div class="nome">' + info.flag + " " + info.nome + ' <span class="mut">' + t + '</span></div><div class="mut">' + info.pais + " · " + info.setor + "</div></div>" +
+      '<div><div class="nome">' + info.flag + " " + info.nome + ' <span class="mut">' + t + '</span></div><div class="mut">' + info.pais + " · " + info.setor + '</div><div class="mut">💰 paga ' + r2(info.div * 100) + "% por rodada</div></div>" +
       '<div class="preco">' + fmt(a.preco) + '<div class="' + (varBase >= 0 ? "up" : "down") + '" style="font-size:13px">' + pct(varBase) + "</div></div>" +
-      '<div class="tenho">Você tem <b>' + qtd + "</b> ações" + (qtd ? " · vale " + fmt(qtd * a.preco) : "") + "</div>" +
+      '<div class="tenho">Você tem <b>' + qtd + "</b> ações" + (qtd ? " · vale " + fmt(qtd * a.preco) + " · rende " + fmt(qtd * a.preco * info.div) + "/rodada" : "") + "</div>" +
       (!aberto && (st.c || st.v) ? '<div class="rod">Última rodada: ' + (st.c || 0) + " compradas · " + (st.v || 0) + " vendidas</div>" : "") +
       '<div class="btns">' +
         '<button class="buy" onclick="comprar(\'' + t + '\',1)">+1</button>' +
@@ -299,7 +312,7 @@ function renderHist() {
       : '<span class="mut">Sem efeito nos preços.</span>';
     const tx = n.texto ? '<div class="tx">' + esc(n.texto) + "</div>" : "";
     return '<details class="hi"' + (abertos[n.ts] ? " open" : "") + ' ontoggle="abertos[' + Number(n.ts) + ']=this.open">' +
-      '<summary><span class="dot" style="background:' + corEvento(n.efeitos) + '"></span><span class="tt">' + esc(n.titulo || "") + (i === 0 ? tx : "") + "</span>" +
+      '<summary><span class="dot" style="background:' + corNoticia(n) + '"></span><span class="tt">' + esc(n.titulo || "") + (i === 0 ? tx : "") + "</span>" +
       '<span class="seta">▸</span></summary>' + (i ? tx : "") + '<div class="efs">' + efs + "</div></details>";
   }).join("") + "</div>";
 }

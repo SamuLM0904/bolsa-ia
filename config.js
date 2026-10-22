@@ -14,17 +14,17 @@ const db = firebase.database();
 // ===== REGRAS DO JOGO =====
 const CAIXA_INICIAL = 1000;   // IA$ que cada aluno recebe
 const IMPACTO = 0.015;        // cada ação comprada sobe o preço 1,5% (vendida: cai 1,5%)
-const DIVIDENDO = 0.03;       // dividendo = 3% do valor de cada ação na carteira
 
 // ===== AÇÕES (fictícias, inspiradas nas empresas reais) =====
+// div = dividendo pago ao fim de cada pregão, sobre o valor da ação (maduras pagam mais, startups menos)
 const ACOES = {
-  NVDA: { nome: "Nvidia",      pais: "EUA",     flag: "🇺🇸", setor: "Projeta os chips de IA",        preco: 120 },
-  TSM:  { nome: "TSMC",        pais: "Taiwan",  flag: "🇹🇼", setor: "Fabrica os chips",              preco: 100 },
-  ASML: { nome: "ASML",        pais: "Holanda", flag: "🇳🇱", setor: "Máquinas que fazem chips",      preco: 90  },
-  OPAI: { nome: "OpenAI",      pais: "EUA",     flag: "🇺🇸", setor: "ChatGPT",                       preco: 110 },
-  GOOG: { nome: "Google",      pais: "EUA",     flag: "🇺🇸", setor: "Gemini + data centers",         preco: 100 },
-  DSEK: { nome: "DeepSeek",    pais: "China",   flag: "🇨🇳", setor: "IA chinesa open source",        preco: 40  },
-  MRTC: { nome: "Maritaca AI", pais: "Brasil",  flag: "🇧🇷", setor: "Sabiá, IA brasileira",          preco: 20  }
+  NVDA: { nome: "Nvidia",      pais: "EUA",     flag: "🇺🇸", setor: "Projeta os chips de IA",        preco: 120, div: 0.01 },
+  TSM:  { nome: "TSMC",        pais: "Taiwan",  flag: "🇹🇼", setor: "Fabrica os chips",              preco: 100, div: 0.04 },
+  ASML: { nome: "ASML",        pais: "Holanda", flag: "🇳🇱", setor: "Máquinas que fazem chips",      preco: 90,  div: 0.03 },
+  OPAI: { nome: "OpenAI",      pais: "EUA",     flag: "🇺🇸", setor: "ChatGPT",                       preco: 110, div: 0.01 },
+  GOOG: { nome: "Google",      pais: "EUA",     flag: "🇺🇸", setor: "Gemini + data centers",         preco: 100, div: 0.03 },
+  DSEK: { nome: "DeepSeek",    pais: "China",   flag: "🇨🇳", setor: "IA chinesa open source",        preco: 40,  div: 0.01 },
+  MRTC: { nome: "Maritaca AI", pais: "Brasil",  flag: "🇧🇷", setor: "Sabiá, IA brasileira",          preco: 20,  div: 0.01 }
 };
 const TICKERS = Object.keys(ACOES);
 

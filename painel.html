@@ -55,7 +55,8 @@
     <h2 style="margin-top:14px">Telão</h2>
     <button class="b" onclick="toggle('qr')">QR Code grande: <span id="qrSt">-</span></button>
     <button class="b" onclick="toggle('final')">Resultado final: <span id="finalSt">-</span></button>
-    <button class="y" onclick="dividendos()">💰 Pagar dividendos (3%)</button>
+    <button class="y" onclick="dividendos()">💰 Dividendos extras</button>
+    <p class="mut">Dividendos são pagos sozinhos ao fechar cada pregão.</p>
     <div><button class="b" onclick="toggleJog()">👥 <span id="jogBtn">Mostrar jogadores</span></button></div>
     <div id="listaJog" class="hidden">
       <table id="tabJog" style="margin-top:8px"></table>
@@ -216,7 +217,16 @@ function abrir(seg) {
   const r = ((estado.pregao && estado.pregao.rodada) || 0) + 1;
   db.ref("estado/pregao").set({ aberto: true, fimEm: agora() + seg * 1000, rodada: r });
 }
-function fechar() { db.ref("estado/pregao/aberto").set(false); }
+function fechar() {
+  const p = estado.pregao || {};
+  db.ref("estado/pregao/aberto").set(false);
+  if (p.aberto && p.rodada) dividendosRodada(p.rodada);
+}
+// paga uma vez por rodada, mesmo que fechar() rode várias vezes ou haja duas abas do painel
+async function dividendosRodada(r) {
+  const t = await db.ref("estado/divRodada").transaction(v => (v || 0) >= r ? undefined : r);
+  if (t.committed) pagarDividendos("Dividendos da rodada " + r);
+}
 function toggle(k) { db.ref("estado/" + k).set(!estado[k]); }
 
 async function aplicar(efeitos) {
@@ -262,17 +272,25 @@ function noticiaLivre() {
   document.getElementById("nt").value = ""; document.getElementById("nx").value = "";
 }
 async function dividendos() {
-  if (!confirm("Pagar 3% de dividendos sobre o valor das ações de cada jogador?")) return;
+  if (!confirm("Pagar dividendos extras agora (taxa de cada ação sobre o valor da carteira)?")) return;
+  alert("Pago: " + fmt(await pagarDividendos("Dividendos extras")));
+}
+// credita em caixa: Σ qtd × preço × taxa da ação (ACOES[t].div)
+async function pagarDividendos(titulo) {
   let total = 0;
   await Promise.all(Object.entries(jogadores).map(([id, j]) => {
     let d = 0; const c = j.carteira || {};
-    for (const t in c) d += (c[t] || 0) * ((acoes[t] && acoes[t].preco) || 0) * DIVIDENDO;
+    for (const t in c) d += (c[t] || 0) * ((acoes[t] && acoes[t].preco) || 0) * ((ACOES[t] && ACOES[t].div) || 0);
     d = r2(d); total += d;
     if (!d) return null;
-    return db.ref("jogadores/" + id + "/caixa").transaction(x => r2((x || 0) + d));
+    return db.ref("jogadores/" + id).transaction(x => {
+      if (x === null) return; // aborta: jogador saiu
+      x.caixa = r2((x.caixa || 0) + d); return x;
+    });
   }));
-  publicar({ titulo: "💰 Dividendos pagos!", texto: "Quem tem ação recebeu 3% do valor em dinheiro.", ts: agora() });
-  alert("Pago: " + fmt(total));
+  const taxas = TICKERS.slice().sort((a, b) => ACOES[b].div - ACOES[a].div).map(t => t + " " + r2(ACOES[t].div * 100) + "%").join(" · ");
+  publicar({ titulo: "💰 " + titulo + "!", texto: "Quem tem ações recebeu renda: " + taxas, div: true, ts: agora() });
+  return total;
 }
 function expulsar(id) {
   const j = jogadores[id]; if (!j) return;

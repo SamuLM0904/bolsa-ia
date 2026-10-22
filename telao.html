@@ -133,7 +133,7 @@ function renderAcoes() {
     h += '<div class="card acao ' + fl + '"><div class="t"><span>' + i.flag + " " + i.nome + '</span><span class="mut">' + t + "</span></div>" +
       '<div class="p">' + fmt(a.preco) + '</div><div class="v ' + (v >= 0 ? "up" : "down") + '">' + (v >= 0 ? "▲ " : "▼ ") + pct(v) + "</div>" +
       spark(hist[t]) +
-      '<div class="rod">' + i.pais + (!aberto && (s.c || s.v) ? " · rodada: " + (s.c || 0) + " compradas / " + (s.v || 0) + " vendidas" : "") + "</div></div>";
+      '<div class="rod">' + i.pais + " · 💰 " + r2(i.div * 100) + "%/rodada" + (!aberto && (s.c || s.v) ? " · rodada: " + (s.c || 0) + " compradas / " + (s.v || 0) + " vendidas" : "") + "</div></div>";
   }
   document.getElementById("acoes").innerHTML = h;
 }
