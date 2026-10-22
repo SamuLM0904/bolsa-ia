@@ -128,3 +128,8 @@ O painel fica no meu celular ou num notebook **fora do projetor**. A aba do pain
 ---
 
 **Primeira tarefa:** leia os 4 arquivos, confirme que entendeu a arquitetura em até 10 linhas e aponte qualquer bug ou risco que você encontrar. **Não altere nada ainda.**
+
+
+https://www.canva.com/design/DAHX6fRDLgc/pBEqW-SIt9lZ93-cuJSerQ/edit
+
+https://docs.google.com/document/d/1BU2wBbRXvpOqyI_shDSOV1AYkYkMGnXhMdlHdXktGnw/edit?tab=t.0
