@@ -89,9 +89,20 @@ function toast(msg) {
   t.textContent = msg; t.style.display = "block";
   clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", 2200);
 }
-function flash() {
+// cor da luz conforme o efeito médio no mercado: vermelho (muito ruim) → laranja → azul (neutro) → verde-limão → verde (muito bom)
+function corEvento(efeitos) {
+  if (!efeitos) return "#3b82f6";
+  const media = TICKERS.reduce((s, t) => s + (Number(efeitos[t]) || 0), 0) / TICKERS.length;
+  const x = Math.max(-1, Math.min(1, media / 20)); // ±20% de média já é o extremo
+  if (Math.abs(x) < 0.1) return "#3b82f6";
+  const k = (Math.abs(x) - 0.1) / 0.9;
+  const hue = x < 0 ? 40 - 40 * k : 75 + 55 * k;
+  return "hsl(" + hue.toFixed(0) + ",90%,50%)";
+}
+function flash(cor) {
   const f = document.getElementById("flash");
-  f.style.opacity = .6; setTimeout(() => f.style.opacity = 0, 350);
+  f.style.background = cor || "var(--acc)";
+  f.style.opacity = .6; setTimeout(() => f.style.opacity = 0, 700);
   try { navigator.vibrate && navigator.vibrate([150, 80, 150]); } catch (e) {}
 }
 
@@ -113,7 +124,7 @@ db.ref("jogadores").on("value", s => { todos = s.val() || {}; renderFinal(); });
 db.ref("estado").on("value", s => {
   estado = s.val() || {};
   const n = estado.noticia;
-  if (n && n.ts && n.ts !== ultimaNoticia) { if (ultimaNoticia) flash(); ultimaNoticia = n.ts; }
+  if (n && n.ts && n.ts !== ultimaNoticia) { if (ultimaNoticia) flash(corEvento(n.efeitos)); ultimaNoticia = n.ts; }
   const rod = estado.pregao ? estado.pregao.rodada : 0;
   db.ref("rodadas/" + rod).once("value", r => { rodadaStats = r.val() || {}; render(); });
   document.getElementById("telaJogo").classList.toggle("hidden", !eu || !!estado.final);

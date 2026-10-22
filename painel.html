@@ -25,7 +25,15 @@
   .ev.usado { opacity:.45; }
   input { width:100%; padding:9px; border-radius:8px; border:1px solid var(--line); background:#0f151d; color:var(--txt); margin-bottom:6px; font-size:14px; }
   .mini button { padding:5px 8px; font-size:12px; margin:1px; }
-  .efx input { width:90px; margin:0; text-align:right; }
+  .efx .lin { padding:6px 0; border-bottom:1px solid var(--line); }
+  .efx .top { display:flex; justify-content:space-between; font-size:14px; }
+  .efx .top b.val { min-width:56px; text-align:right; }
+  .efx input[type=range] { -webkit-appearance:none; appearance:none; width:100%; height:12px; padding:0; margin:8px 0 2px; border:0; border-radius:6px;
+    background:linear-gradient(to right, var(--down), #3f4a5a 50%, var(--up)); cursor:pointer; }
+  .efx input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:24px; height:24px; border-radius:50%; background:#fff; border:3px solid #0b0f14; }
+  .efx input[type=range]::-moz-range-thumb { width:20px; height:20px; border-radius:50%; background:#fff; border:3px solid #0b0f14; }
+  .efx input[type=range]::-moz-range-track { background:transparent; }
+  .efx .esc { display:flex; justify-content:space-between; font-size:11px; color:var(--mut); }
 </style>
 </head>
 <body>
@@ -62,8 +70,8 @@
     <h2>Evento personalizado</h2>
     <input id="ct" placeholder="Título">
     <input id="cx" placeholder="Texto">
-    <p class="mut" style="margin:4px 0">Efeito em % por ação (ex.: 25 sobe 25%, -40 cai 40%). Vazio ou 0 = não muda.</p>
-    <table id="tabCustom" class="efx"></table>
+    <p class="mut" style="margin:4px 0">Arraste para definir o efeito de cada ação (−30% a +30%). No meio (0) = não muda.</p>
+    <div id="tabCustom" class="efx"></div>
     <div style="margin-top:8px">
       <button class="y" onclick="eventoCustom()">Disparar evento</button>
       <button onclick="limparCustom()">Limpar</button>
@@ -112,9 +120,16 @@ db.ref("estado").on("value", s => {
   render();
 });
 db.ref("acoes").on("value", s => { acoes = s.val() || {}; render(); });
-document.getElementById("tabCustom").innerHTML = "<tr><th>Ação</th><th>Efeito (%)</th></tr>" + TICKERS.map(t =>
-  "<tr><td>" + ACOES[t].flag + " " + t + " <span class='mut'>" + ACOES[t].nome + "</span></td><td>" +
-  '<input type="number" inputmode="decimal" step="1" min="-95" max="500" id="cf_' + t + '" placeholder="0"></td></tr>').join("");
+document.getElementById("tabCustom").innerHTML = TICKERS.map(t =>
+  '<div class="lin"><div class="top"><span>' + ACOES[t].flag + " <b>" + t + "</b> <span class='mut'>" + ACOES[t].nome + "</span></span>" +
+  '<b class="val mut" id="cv_' + t + '">0%</b></div>' +
+  '<input type="range" min="-30" max="30" step="1" value="0" id="cf_' + t + '" oninput="mostrarCustom(\'' + t + '\')">' +
+  '<div class="esc"><span>−30%</span><span>0</span><span>+30%</span></div></div>').join("");
+function mostrarCustom(t) {
+  const v = Number(document.getElementById("cf_" + t).value), el = document.getElementById("cv_" + t);
+  el.textContent = (v > 0 ? "+" : "") + v + "%";
+  el.className = "val " + (v > 0 ? "up" : v < 0 ? "down" : "mut");
+}
 db.ref("jogadores").on("value", s => { jogadores = s.val() || {}; renderRank(); });
 
 setInterval(() => {
@@ -191,10 +206,7 @@ async function eventoCustom() {
   if (!titulo) { alert("Escreva um título."); return; }
   const efeitos = {};
   for (const t of TICKERS) {
-    const raw = document.getElementById("cf_" + t).value.trim().replace(",", ".");
-    if (!raw) continue;
-    const v = Number(raw);
-    if (!isFinite(v) || v < -95 || v > 500) { alert(t + ": use um número entre -95 e 500."); return; }
+    const v = Number(document.getElementById("cf_" + t).value);
     if (v) efeitos[t] = v;
   }
   if (!Object.keys(efeitos).length) { alert("Defina o efeito de pelo menos uma ação."); return; }
@@ -206,7 +218,7 @@ async function eventoCustom() {
 }
 function limparCustom() {
   document.getElementById("ct").value = ""; document.getElementById("cx").value = "";
-  for (const t of TICKERS) document.getElementById("cf_" + t).value = "";
+  for (const t of TICKERS) { document.getElementById("cf_" + t).value = 0; mostrarCustom(t); }
 }
 function noticiaLivre() {
   const titulo = document.getElementById("nt").value.trim(); if (!titulo) return;
