@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel · Bolsa da IA</title>
+<style>
+  :root { --bg:#0b0f14; --card:#141b24; --line:#223042; --txt:#e6edf3; --mut:#8b9bb0; --up:#22c55e; --down:#ef4444; --acc:#facc15; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--txt); font-family:system-ui,Segoe UI,Roboto,sans-serif; padding:16px; }
+  h1 { font-size:22px; } h1 span { color:var(--acc); }
+  h2 { font-size:15px; color:var(--acc); margin-bottom:8px; text-transform:uppercase; letter-spacing:1px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:12px; margin-top:12px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; }
+  button { border:0; border-radius:9px; font-weight:700; padding:9px 12px; cursor:pointer; margin:3px 2px; font-size:14px; background:#334155; color:#fff; }
+  .g { background:#166534; } .r { background:#991b1b; } .y { background:var(--acc); color:#000; } .b { background:#1d4ed8; }
+  .status { font-size:20px; font-weight:800; padding:10px; border-radius:10px; text-align:center; margin-bottom:8px; }
+  .aberto { background:#14532d; } .fechado { background:#3f1d1d; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  td, th { padding:5px 4px; border-bottom:1px solid var(--line); text-align:left; }
+  th { color:var(--mut); font-weight:600; }
+  .up { color:var(--up); } .down { color:var(--down); } .mut { color:var(--mut); font-size:13px; }
+  .ev { border:1px solid var(--line); border-radius:10px; padding:8px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .ev small { color:var(--mut); display:block; }
+  .ev.usado { opacity:.45; }
+  input { width:100%; padding:9px; border-radius:8px; border:1px solid var(--line); background:#0f151d; color:var(--txt); margin-bottom:6px; font-size:14px; }
+  .mini button { padding:5px 8px; font-size:12px; margin:1px; }
+  .efx input { width:90px; margin:0; text-align:right; }
+</style>
+</head>
+<body>
+<h1>🎛️ Painel da <span>Bolsa da IA</span></h1>
+<p class="mut">Telão: <b id="linkTelao"></b> · Alunos: <b id="linkAluno"></b></p>
+
+<div class="grid">
+  <div class="card">
+    <h2>Pregão</h2>
+    <div id="status" class="status fechado">FECHADO</div>
+    <div>Rodada atual: <b id="rodada">0</b> · Jogadores: <b id="nJog">0</b></div>
+    <div style="margin-top:8px">
+      <button class="g" onclick="abrir(45)">Abrir 45s</button>
+      <button class="g" onclick="abrir(60)">Abrir 60s</button>
+      <button class="g" onclick="abrir(90)">Abrir 90s</button>
+      <button class="r" onclick="fechar()">Fechar agora</button>
+    </div>
+    <h2 style="margin-top:14px">Telão</h2>
+    <button class="b" onclick="toggle('qr')">QR Code grande: <span id="qrSt">-</span></button>
+    <button class="b" onclick="toggle('final')">Resultado final: <span id="finalSt">-</span></button>
+    <button class="y" onclick="dividendos()">💰 Pagar dividendos (3%)</button>
+  </div>
+
+  <div class="card">
+    <h2>Eventos (notícias)</h2>
+    <div id="eventos"></div>
+    <h2 style="margin-top:10px">Notícia livre (sem efeito)</h2>
+    <input id="nt" placeholder="Título">
+    <input id="nx" placeholder="Texto">
+    <button class="y" onclick="noticiaLivre()">Publicar</button>
+  </div>
+
+  <div class="card">
+    <h2>Evento personalizado</h2>
+    <input id="ct" placeholder="Título">
+    <input id="cx" placeholder="Texto">
+    <p class="mut" style="margin:4px 0">Efeito em % por ação (ex.: 25 sobe 25%, -40 cai 40%). Vazio ou 0 = não muda.</p>
+    <table id="tabCustom" class="efx"></table>
+    <div style="margin-top:8px">
+      <button class="y" onclick="eventoCustom()">Disparar evento</button>
+      <button onclick="limparCustom()">Limpar</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Ações · ajuste manual</h2>
+    <table id="tabAcoes"></table>
+  </div>
+
+  <div class="card">
+    <h2>Movimento da rodada</h2>
+    <table id="tabRodada"></table>
+  </div>
+
+  <div class="card">
+    <h2>Ranking</h2>
+    <table id="tabRank"></table>
+  </div>
+
+  <div class="card">
+    <h2>Zona de perigo</h2>
+    <p class="mut">Zera tudo: preços voltam ao início e todos os jogadores são apagados. Use antes da aula.</p>
+    <button class="r" onclick="resetar()">🔄 RESETAR JOGO</button>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="config.js"></script>
+<script>
+const base = location.href.replace(/painel\.html.*$/, "");
+document.getElementById("linkTelao").textContent = base + "telao.html";
+document.getElementById("linkAluno").textContent = base;
+
+let estado = {}, acoes = {}, jogadores = {}, rod = {}, rodRef = null, rodAtual = -1;
+db.ref("estado").on("value", s => {
+  estado = s.val() || {};
+  const r = estado.pregao ? estado.pregao.rodada : 0;
+  if (r !== rodAtual) {
+    if (rodRef) rodRef.off();
+    rodAtual = r; rodRef = db.ref("rodadas/" + r);
+    rodRef.on("value", x => { rod = x.val() || {}; renderRodada(); });
+  }
+  render();
+});
+db.ref("acoes").on("value", s => { acoes = s.val() || {}; render(); });
+document.getElementById("tabCustom").innerHTML = "<tr><th>Ação</th><th>Efeito (%)</th></tr>" + TICKERS.map(t =>
+  "<tr><td>" + ACOES[t].flag + " " + t + " <span class='mut'>" + ACOES[t].nome + "</span></td><td>" +
+  '<input type="number" inputmode="decimal" step="1" min="-95" max="500" id="cf_' + t + '" placeholder="0"></td></tr>').join("");
+db.ref("jogadores").on("value", s => { jogadores = s.val() || {}; renderRank(); });
+
+setInterval(() => {
+  const p = estado.pregao || {};
+  const el = document.getElementById("status");
+  if (p.aberto && p.fimEm <= agora()) { fechar(); }
+  if (pregaoAberto(estado)) {
+    el.className = "status aberto"; el.textContent = "🟢 ABERTO · " + Math.ceil((p.fimEm - agora()) / 1000) + "s";
+  } else { el.className = "status fechado"; el.textContent = "🔒 FECHADO"; }
+}, 300);
+
+function render() {
+  document.getElementById("rodada").textContent = estado.pregao ? estado.pregao.rodada : 0;
+  document.getElementById("qrSt").textContent = estado.qr ? "ON" : "OFF";
+  document.getElementById("finalSt").textContent = estado.final ? "ON" : "OFF";
+  const usados = estado.usados || {};
+  document.getElementById("eventos").innerHTML = EVENTOS.map((e, i) => {
+    const ef = Object.entries(e.efeitos).map(([t, v]) => '<span class="' + (v >= 0 ? "up" : "down") + '">' + t + " " + (v > 0 ? "+" : "") + v + "%</span>").join(" ");
+    return '<div class="ev ' + (usados[e.id] ? "usado" : "") + '"><div><b>' + e.titulo + "</b> <span class='mut'>(" + e.bloco + ")</span><small>" + ef + "</small></div>" +
+      '<button class="y" onclick="evento(' + i + ')">Disparar</button></div>';
+  }).join("");
+  let h = "<tr><th>Ação</th><th>Preço</th><th>Var.</th><th>Ajuste</th></tr>";
+  for (const t of TICKERS) {
+    const a = acoes[t]; if (!a) continue;
+    const v = (a.preco / a.base - 1) * 100;
+    h += "<tr><td>" + ACOES[t].flag + " " + t + "</td><td>" + a.preco.toFixed(2) + '</td><td class="' + (v >= 0 ? "up" : "down") + '">' + pct(v) + '</td><td class="mini">' +
+      [-20, -5, 5, 20].map(x => '<button class="' + (x < 0 ? "r" : "g") + '" onclick="mexer(\'' + t + "'," + x + ')">' + (x > 0 ? "+" : "") + x + "%</button>").join("") + "</td></tr>";
+  }
+  document.getElementById("tabAcoes").innerHTML = h;
+  renderRank();
+}
+
+function renderRodada() {
+  let h = "<tr><th>Ação</th><th>Compradas</th><th>Vendidas</th></tr>";
+  for (const t of TICKERS) { const s = rod[t] || {}; h += "<tr><td>" + t + "</td><td class='up'>" + (s.c || 0) + "</td><td class='down'>" + (s.v || 0) + "</td></tr>"; }
+  document.getElementById("tabRodada").innerHTML = h;
+}
+
+function renderRank() {
+  const lista = Object.values(jogadores).map(j => ({ nome: j.nome, p: patrimonio(j, acoes) })).sort((a, b) => b.p - a.p);
+  document.getElementById("nJog").textContent = lista.length;
+  let h = "<tr><th>#</th><th>Nome</th><th>Patrimônio</th><th>Lucro</th></tr>";
+  lista.slice(0, 15).forEach((j, i) => {
+    const l = (j.p / CAIXA_INICIAL - 1) * 100;
+    h += "<tr><td>" + (i + 1) + "</td><td>" + esc(j.nome) + "</td><td>" + fmt(j.p) + '</td><td class="' + (l >= 0 ? "up" : "down") + '">' + pct(l) + "</td></tr>";
+  });
+  document.getElementById("tabRank").innerHTML = h;
+}
+function esc(s) { return String(s || "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+// ----- ações do controlador -----
+function abrir(seg) {
+  const r = ((estado.pregao && estado.pregao.rodada) || 0) + 1;
+  db.ref("estado/pregao").set({ aberto: true, fimEm: agora() + seg * 1000, rodada: r });
+}
+function fechar() { db.ref("estado/pregao/aberto").set(false); }
+function toggle(k) { db.ref("estado/" + k).set(!estado[k]); }
+
+async function aplicar(efeitos) {
+  await Promise.all(Object.entries(efeitos).map(([t, v]) =>
+    db.ref("acoes/" + t + "/preco").transaction(p => p === null ? undefined : Math.max(1, r2(p * (1 + v / 100))))
+  ));
+}
+async function evento(i) {
+  const e = EVENTOS[i];
+  if (!confirm("Disparar: " + e.titulo + "?")) return;
+  await aplicar(e.efeitos);
+  db.ref("estado/noticia").set({ titulo: e.titulo, texto: e.texto, efeitos: e.efeitos, ts: agora() });
+  db.ref("estado/usados/" + e.id).set(true);
+}
+function mexer(t, v) { aplicar({ [t]: v }); }
+async function eventoCustom() {
+  const titulo = document.getElementById("ct").value.trim();
+  if (!titulo) { alert("Escreva um título."); return; }
+  const efeitos = {};
+  for (const t of TICKERS) {
+    const raw = document.getElementById("cf_" + t).value.trim().replace(",", ".");
+    if (!raw) continue;
+    const v = Number(raw);
+    if (!isFinite(v) || v < -95 || v > 500) { alert(t + ": use um número entre -95 e 500."); return; }
+    if (v) efeitos[t] = v;
+  }
+  if (!Object.keys(efeitos).length) { alert("Defina o efeito de pelo menos uma ação."); return; }
+  const resumo = Object.entries(efeitos).map(([t, v]) => t + " " + (v > 0 ? "+" : "") + v + "%").join(", ");
+  if (!confirm("Disparar: " + titulo + "?\n" + resumo)) return;
+  await aplicar(efeitos);
+  db.ref("estado/noticia").set({ titulo, texto: document.getElementById("cx").value.trim(), efeitos, ts: agora() });
+  limparCustom();
+}
+function limparCustom() {
+  document.getElementById("ct").value = ""; document.getElementById("cx").value = "";
+  for (const t of TICKERS) document.getElementById("cf_" + t).value = "";
+}
+function noticiaLivre() {
+  const titulo = document.getElementById("nt").value.trim(); if (!titulo) return;
+  db.ref("estado/noticia").set({ titulo, texto: document.getElementById("nx").value.trim(), ts: agora() });
+  document.getElementById("nt").value = ""; document.getElementById("nx").value = "";
+}
+async function dividendos() {
+  if (!confirm("Pagar 3% de dividendos sobre o valor das ações de cada jogador?")) return;
+  let total = 0;
+  await Promise.all(Object.entries(jogadores).map(([id, j]) => {
+    let d = 0; const c = j.carteira || {};
+    for (const t in c) d += (c[t] || 0) * ((acoes[t] && acoes[t].preco) || 0) * DIVIDENDO;
+    d = r2(d); total += d;
+    if (!d) return null;
+    return db.ref("jogadores/" + id + "/caixa").transaction(x => r2((x || 0) + d));
+  }));
+  db.ref("estado/noticia").set({ titulo: "💰 Dividendos pagos!", texto: "Quem tem ação recebeu 3% do valor em dinheiro.", ts: agora() });
+  alert("Pago: " + fmt(total));
+}
+function resetar() {
+  if (prompt("Isso apaga TUDO. Digite RESET para confirmar") !== "RESET") return;
+  const novas = {};
+  for (const t of TICKERS) novas[t] = { preco: ACOES[t].preco, base: ACOES[t].preco };
+  db.ref().update({
+    acoes: novas, jogadores: null, rodadas: null,
+    estado: { pregao: { aberto: false, fimEm: 0, rodada: 0 }, qr: true, final: false, noticia: null, usados: null }
+  });
+}
+</script>
+</body>
+</html>

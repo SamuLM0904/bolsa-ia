@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Telão · Bolsa da IA</title>
+<style>
+  :root { --bg:#05080c; --card:#0f161f; --line:#1e2a3a; --txt:#e6edf3; --mut:#7d8ea5; --up:#22c55e; --down:#ef4444; --acc:#facc15; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { height:100%; }
+  body { background:var(--bg); color:var(--txt); font-family:system-ui,Segoe UI,Roboto,sans-serif; display:flex; flex-direction:column; overflow:hidden; }
+  header { display:flex; justify-content:space-between; align-items:center; padding:14px 24px; border-bottom:1px solid var(--line); }
+  header h1 { font-size:34px; letter-spacing:2px; } header h1 span { color:var(--acc); }
+  #status { font-size:28px; font-weight:900; padding:8px 22px; border-radius:12px; }
+  .aberto { background:#14532d; color:#bbf7d0; animation:pulse 1s infinite; }
+  .fechado { background:#3f1d1d; color:#fecaca; }
+  @keyframes pulse { 50% { filter:brightness(1.4); } }
+  #news { background:var(--acc); color:#000; font-size:26px; font-weight:800; padding:12px 24px; white-space:nowrap; overflow:hidden; }
+  #news.boom { animation:shake .5s 4; }
+  @keyframes shake { 25% { transform:translateX(-10px); } 75% { transform:translateX(10px); } }
+  main { flex:1; display:grid; grid-template-columns:3fr 1.15fr; gap:16px; padding:16px 24px; min-height:0; }
+  #acoes { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:12px; align-content:start; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px; }
+  .acao .t { display:flex; justify-content:space-between; font-size:20px; font-weight:800; }
+  .acao .p { font-size:30px; font-weight:900; margin-top:4px; }
+  .acao .v { font-size:18px; font-weight:800; }
+  .acao svg { width:100%; height:44px; margin-top:6px; }
+  .acao .rod { font-size:14px; color:var(--mut); margin-top:2px; }
+  .mut { color:var(--mut); font-size:14px; }
+  .up { color:var(--up); } .down { color:var(--down); }
+  .flashUp { animation:fu .8s; } .flashDown { animation:fd .8s; }
+  @keyframes fu { 0% { background:#14532d; } } @keyframes fd { 0% { background:#7f1d1d; } }
+  #rank h2 { color:var(--acc); font-size:22px; margin-bottom:8px; }
+  .lin { display:flex; justify-content:space-between; font-size:19px; padding:7px 0; border-bottom:1px solid var(--line); }
+  .lin b { color:var(--acc); width:34px; display:inline-block; }
+  #qrBox { position:fixed; inset:0; background:rgba(0,0,0,.92); display:none; align-items:center; justify-content:center; flex-direction:column; gap:20px; z-index:10; }
+  #qrBox h2 { font-size:48px; } #qrBox h2 span { color:var(--acc); }
+  #qr { background:#fff; padding:18px; border-radius:16px; }
+  #qrBox .url { font-size:24px; color:var(--acc); }
+  #finalBox { position:fixed; inset:0; background:var(--bg); display:none; flex-direction:column; align-items:center; justify-content:center; z-index:11; }
+  #finalBox h2 { font-size:54px; margin-bottom:30px; }
+  .podio { display:flex; align-items:flex-end; gap:24px; }
+  .deg { width:230px; text-align:center; }
+  .deg .bar { background:var(--card); border:2px solid var(--acc); border-radius:14px 14px 0 0; display:flex; align-items:center; justify-content:center; font-size:60px; font-weight:900; color:var(--acc); }
+  .deg .n { font-size:28px; font-weight:800; margin-bottom:6px; } .deg .v { font-size:20px; color:var(--mut); margin-bottom:8px; }
+  #smallQr { position:fixed; right:14px; bottom:14px; background:#fff; padding:6px; border-radius:8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📈 BOLSA DA <span>IA</span></h1>
+  <div id="status" class="fechado">🔒 PREGÃO FECHADO</div>
+</header>
+<div id="news">Aguardando a abertura do mercado…</div>
+<main>
+  <div id="acoes"></div>
+  <div id="rank" class="card"><h2>🏆 Top investidores</h2><div id="lista"></div><p class="mut" style="margin-top:10px" id="nJog"></p></div>
+</main>
+
+<div id="qrBox"><h2>Entre na <span>Bolsa da IA</span></h2><div id="qr"></div><div class="url" id="url"></div></div>
+<div id="finalBox"><h2>🏁 RESULTADO FINAL</h2><div class="podio" id="podio"></div></div>
+<div id="smallQr"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="config.js"></script>
+<script>
+const urlAluno = location.href.replace(/telao\.html.*$/, "");
+document.getElementById("url").textContent = urlAluno;
+try {
+  new QRCode(document.getElementById("qr"), { text: urlAluno, width: 380, height: 380 });
+  new QRCode(document.getElementById("smallQr"), { text: urlAluno, width: 90, height: 90 });
+} catch (e) {}
+
+let estado = {}, acoes = {}, jogadores = {}, rod = {}, rodRef = null, rodAtual = -1;
+const hist = {}, ultimo = {};
+let ultimaNoticia = 0;
+
+db.ref("acoes").on("value", s => {
+  acoes = s.val() || {};
+  for (const t of TICKERS) {
+    if (!acoes[t]) continue;
+    hist[t] = hist[t] || [];
+    const p = acoes[t].preco;
+    if (hist[t][hist[t].length - 1] !== p) hist[t].push(p);
+    if (hist[t].length > 60) hist[t].shift();
+  }
+  renderAcoes(); renderRank();
+});
+db.ref("jogadores").on("value", s => { jogadores = s.val() || {}; renderRank(); });
+db.ref("estado").on("value", s => {
+  estado = s.val() || {};
+  const r = estado.pregao ? estado.pregao.rodada : 0;
+  if (r !== rodAtual) {
+    if (rodRef) rodRef.off();
+    rodAtual = r; rodRef = db.ref("rodadas/" + r);
+    rodRef.on("value", x => { rod = x.val() || {}; renderAcoes(); });
+  }
+  const n = estado.noticia, nEl = document.getElementById("news");
+  if (n) {
+    nEl.textContent = "📰 " + n.titulo + (n.texto ? " — " + n.texto : "");
+    if (n.ts !== ultimaNoticia) { nEl.classList.remove("boom"); void nEl.offsetWidth; nEl.classList.add("boom"); ultimaNoticia = n.ts; }
+  }
+  document.getElementById("qrBox").style.display = estado.qr ? "flex" : "none";
+  document.getElementById("finalBox").style.display = estado.final ? "flex" : "none";
+  renderFinal();
+});
+
+setInterval(() => {
+  const el = document.getElementById("status"), p = estado.pregao || {};
+  if (pregaoAberto(estado)) { el.className = "aberto"; el.textContent = "🟢 PREGÃO ABERTO · " + Math.ceil((p.fimEm - agora()) / 1000) + "s"; }
+  else { el.className = "fechado"; el.textContent = "🔒 PREGÃO FECHADO"; }
+}, 300);
+
+function spark(arr) {
+  if (!arr || arr.length < 2) return "";
+  const min = Math.min(...arr), max = Math.max(...arr), span = (max - min) || 1;
+  const pts = arr.map((v, i) => (i / (arr.length - 1) * 100).toFixed(1) + "," + (40 - (v - min) / span * 36).toFixed(1)).join(" ");
+  const cor = arr[arr.length - 1] >= arr[0] ? "#22c55e" : "#ef4444";
+  return '<svg viewBox="0 0 100 42" preserveAspectRatio="none"><polyline fill="none" stroke="' + cor + '" stroke-width="2" vector-effect="non-scaling-stroke" points="' + pts + '"/></svg>';
+}
+
+function renderAcoes() {
+  const aberto = pregaoAberto(estado);
+  let h = "";
+  for (const t of TICKERS) {
+    const a = acoes[t]; if (!a) continue;
+    const i = ACOES[t], v = (a.preco / a.base - 1) * 100, s = rod[t] || {};
+    let fl = "";
+    if (ultimo[t] !== undefined && ultimo[t] !== a.preco) fl = a.preco > ultimo[t] ? "flashUp" : "flashDown";
+    ultimo[t] = a.preco;
+    h += '<div class="card acao ' + fl + '"><div class="t"><span>' + i.flag + " " + i.nome + '</span><span class="mut">' + t + "</span></div>" +
+      '<div class="p">' + fmt(a.preco) + '</div><div class="v ' + (v >= 0 ? "up" : "down") + '">' + (v >= 0 ? "▲ " : "▼ ") + pct(v) + "</div>" +
+      spark(hist[t]) +
+      '<div class="rod">' + i.pais + (!aberto && (s.c || s.v) ? " · rodada: " + (s.c || 0) + " compradas / " + (s.v || 0) + " vendidas" : "") + "</div></div>";
+  }
+  document.getElementById("acoes").innerHTML = h;
+}
+
+function ranking() {
+  return Object.values(jogadores).map(j => ({ nome: j.nome, p: patrimonio(j, acoes) })).sort((a, b) => b.p - a.p);
+}
+function renderRank() {
+  const l = ranking();
+  document.getElementById("nJog").textContent = l.length + " investidores na bolsa";
+  document.getElementById("lista").innerHTML = l.slice(0, 10).map((j, i) => {
+    const luc = (j.p / CAIXA_INICIAL - 1) * 100;
+    return '<div class="lin"><span><b>' + (i + 1) + "º</b>" + esc(j.nome) + '</span><span class="' + (luc >= 0 ? "up" : "down") + '">' + pct(luc) + "</span></div>";
+  }).join("");
+  renderFinal();
+}
+function renderFinal() {
+  if (!estado.final) return;
+  const l = ranking(), ordem = [1, 0, 2], alt = [200, 280, 150];
+  document.getElementById("podio").innerHTML = ordem.map(k => {
+    const j = l[k]; if (!j) return "";
+    return '<div class="deg"><div class="n">' + esc(j.nome) + '</div><div class="v">' + fmt(j.p) + '</div><div class="bar" style="height:' + alt[k === 1 ? 0 : k === 0 ? 1 : 2] + 'px">' + (k + 1) + "º</div></div>";
+  }).join("");
+}
+function esc(s) { return String(s || "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+</script>
+</body>
+</html>

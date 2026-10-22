@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Bolsa da IA</title>
+<style>
+  :root { --bg:#0b0f14; --card:#141b24; --line:#223042; --txt:#e6edf3; --mut:#8b9bb0; --up:#22c55e; --down:#ef4444; --acc:#facc15; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--txt); font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; padding:12px 12px 90px; }
+  h1 { font-size:20px; letter-spacing:1px; }
+  h1 span { color:var(--acc); }
+  .mut { color:var(--mut); font-size:13px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; margin-top:10px; }
+  input { width:100%; padding:14px; border-radius:10px; border:1px solid var(--line); background:#0f151d; color:var(--txt); font-size:17px; margin-top:10px; }
+  button { border:0; border-radius:10px; font-weight:700; font-size:15px; padding:11px 14px; cursor:pointer; }
+  button:disabled { opacity:.3; }
+  .big { width:100%; background:var(--acc); color:#000; font-size:17px; padding:14px; margin-top:10px; }
+  .top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+  .saldo { text-align:right; }
+  .saldo b { font-size:18px; display:block; }
+  .status { position:sticky; top:0; z-index:5; margin:10px -12px 0; padding:10px 12px; font-weight:800; text-align:center; font-size:15px; }
+  .aberto { background:#14532d; color:#bbf7d0; }
+  .fechado { background:#3f1d1d; color:#fecaca; }
+  .news { border-color:var(--acc); }
+  .news b { color:var(--acc); display:block; font-size:16px; margin-bottom:3px; }
+  .acao { display:grid; grid-template-columns:1fr auto; gap:6px 10px; align-items:center; }
+  .acao .nome { font-weight:800; font-size:16px; }
+  .acao .preco { text-align:right; font-weight:800; font-size:16px; }
+  .up { color:var(--up); } .down { color:var(--down); }
+  .btns { grid-column:1 / -1; display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:6px; margin-top:4px; }
+  .buy { background:#166534; color:#fff; } .sell { background:#7f1d1d; color:#fff; }
+  .tenho { grid-column:1 / -1; font-size:13px; color:var(--mut); }
+  .tenho b { color:var(--txt); }
+  .rod { grid-column:1 / -1; font-size:12px; color:var(--acc); }
+  #toast { position:fixed; left:12px; right:12px; bottom:16px; background:#1f2937; border:1px solid var(--acc); padding:14px; border-radius:12px; text-align:center; font-weight:700; display:none; z-index:20; }
+  #flash { position:fixed; inset:0; background:var(--acc); opacity:0; pointer-events:none; transition:opacity .4s; z-index:15; }
+  .final { text-align:center; padding:24px 12px; }
+  .final .pos { font-size:56px; font-weight:900; color:var(--acc); }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+
+<div id="telaEntrar">
+  <h1>📈 BOLSA DA <span>IA</span></h1>
+  <p class="mut" style="margin-top:6px">Você começa com IA$ 1.000. Compre e venda ações das empresas de IA. Preste atenção na apresentação: cada notícia mexe no mercado.</p>
+  <div class="card">
+    <input id="nome" maxlength="18" placeholder="Seu nome (ou apelido)" autocomplete="off">
+    <button class="big" onclick="entrar()">ENTRAR NA BOLSA</button>
+  </div>
+</div>
+
+<div id="telaJogo" class="hidden">
+  <div class="top">
+    <div><h1>📈 BOLSA DA <span>IA</span></h1><div class="mut" id="eu"></div></div>
+    <div class="saldo"><span class="mut">Caixa</span><b id="caixa">-</b><span class="mut">Patrimônio </span><span id="patri">-</span></div>
+  </div>
+  <div id="status" class="status fechado">🔒 PREGÃO FECHADO</div>
+  <div id="noticia" class="card news hidden"></div>
+  <div id="lista"></div>
+</div>
+
+<div id="telaFinal" class="hidden final">
+  <h1>🏁 FIM DO PREGÃO</h1>
+  <div class="pos" id="fPos">-</div>
+  <div class="mut">sua posição no ranking</div>
+  <div class="card"><div class="mut">Patrimônio final</div><b id="fPatri" style="font-size:24px">-</b><div id="fLucro"></div></div>
+</div>
+
+<div id="toast"></div>
+<div id="flash"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="config.js"></script>
+<script>
+let meuId = null;
+try { meuId = localStorage.getItem("bolsaId"); } catch (e) {}
+if (!meuId) {
+  meuId = "j" + Math.random().toString(36).slice(2, 10);
+  try { localStorage.setItem("bolsaId", meuId); } catch (e) {}
+}
+let eu = null, acoes = {}, estado = {}, rodadaStats = {}, todos = {};
+let ultimaNoticia = 0, operando = false;
+
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.style.display = "block";
+  clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", 2200);
+}
+function flash() {
+  const f = document.getElementById("flash");
+  f.style.opacity = .6; setTimeout(() => f.style.opacity = 0, 350);
+  try { navigator.vibrate && navigator.vibrate([150, 80, 150]); } catch (e) {}
+}
+
+function entrar() {
+  const nome = document.getElementById("nome").value.trim();
+  if (nome.length < 2) return toast("Digite seu nome");
+  db.ref("jogadores/" + meuId).set({ nome, caixa: CAIXA_INICIAL, carteira: {}, entrou: agora() });
+}
+
+// ----- ouvintes -----
+db.ref("jogadores/" + meuId).on("value", s => {
+  eu = s.val();
+  document.getElementById("telaEntrar").classList.toggle("hidden", !!eu);
+  document.getElementById("telaJogo").classList.toggle("hidden", !eu || (estado && estado.final));
+  render();
+});
+db.ref("acoes").on("value", s => { acoes = s.val() || {}; render(); });
+db.ref("jogadores").on("value", s => { todos = s.val() || {}; renderFinal(); });
+db.ref("estado").on("value", s => {
+  estado = s.val() || {};
+  const n = estado.noticia;
+  if (n && n.ts && n.ts !== ultimaNoticia) { if (ultimaNoticia) flash(); ultimaNoticia = n.ts; }
+  const rod = estado.pregao ? estado.pregao.rodada : 0;
+  db.ref("rodadas/" + rod).once("value", r => { rodadaStats = r.val() || {}; render(); });
+  document.getElementById("telaJogo").classList.toggle("hidden", !eu || !!estado.final);
+  document.getElementById("telaFinal").classList.toggle("hidden", !estado.final || !eu);
+  render(); renderFinal();
+});
+setInterval(renderStatus, 500);
+
+// ----- render -----
+function renderStatus() {
+  const el = document.getElementById("status");
+  const p = estado.pregao || {};
+  if (pregaoAberto(estado)) {
+    const seg = Math.max(0, Math.ceil((p.fimEm - agora()) / 1000));
+    el.className = "status aberto"; el.textContent = "🟢 PREGÃO ABERTO · " + seg + "s · rodada " + p.rodada;
+  } else {
+    el.className = "status fechado"; el.textContent = "🔒 PREGÃO FECHADO · aguarde a próxima rodada";
+  }
+  document.querySelectorAll(".buy,.sell").forEach(b => b.disabled = operando || !pregaoAberto(estado));
+}
+
+function render() {
+  if (!eu) return;
+  document.getElementById("eu").textContent = eu.nome;
+  document.getElementById("caixa").textContent = fmt(eu.caixa);
+  const pt = patrimonio(eu, acoes);
+  const luc = (pt / CAIXA_INICIAL - 1) * 100;
+  document.getElementById("patri").innerHTML = fmt(pt) + ' <span class="' + (luc >= 0 ? "up" : "down") + '">' + pct(luc) + "</span>";
+
+  const n = estado.noticia;
+  const nEl = document.getElementById("noticia");
+  if (n) { nEl.classList.remove("hidden"); nEl.innerHTML = "<b>📰 " + esc(n.titulo) + "</b>" + esc(n.texto || ""); }
+  else nEl.classList.add("hidden");
+
+  const aberto = pregaoAberto(estado);
+  const cart = eu.carteira || {};
+  let html = "";
+  for (const t of TICKERS) {
+    const a = acoes[t]; if (!a) continue;
+    const info = ACOES[t];
+    const varBase = (a.preco / a.base - 1) * 100;
+    const qtd = cart[t] || 0;
+    const st = rodadaStats[t] || {};
+    html += '<div class="card acao">' +
+      '<div><div class="nome">' + info.flag + " " + info.nome + ' <span class="mut">' + t + '</span></div><div class="mut">' + info.pais + " · " + info.setor + "</div></div>" +
+      '<div class="preco">' + fmt(a.preco) + '<div class="' + (varBase >= 0 ? "up" : "down") + '" style="font-size:13px">' + pct(varBase) + "</div></div>" +
+      '<div class="tenho">Você tem <b>' + qtd + "</b> ações" + (qtd ? " · vale " + fmt(qtd * a.preco) : "") + "</div>" +
+      (!aberto && (st.c || st.v) ? '<div class="rod">Última rodada: ' + (st.c || 0) + " compradas · " + (st.v || 0) + " vendidas</div>" : "") +
+      '<div class="btns">' +
+        '<button class="buy" onclick="comprar(\'' + t + '\',1)">+1</button>' +
+        '<button class="buy" onclick="comprar(\'' + t + '\',5)">+5</button>' +
+        '<button class="sell" onclick="vender(\'' + t + '\',1)">−1</button>' +
+        '<button class="sell" onclick="vender(\'' + t + '\',' + Math.max(qtd, 1) + ')">Tudo</button>' +
+      "</div></div>";
+  }
+  document.getElementById("lista").innerHTML = html;
+  renderStatus();
+}
+
+function renderFinal() {
+  if (!estado.final || !eu) return;
+  const lista = Object.entries(todos).map(([id, j]) => ({ id, p: patrimonio(j, acoes) })).sort((a, b) => b.p - a.p);
+  const pos = lista.findIndex(x => x.id === meuId) + 1;
+  const pt = patrimonio(eu, acoes);
+  document.getElementById("fPos").textContent = pos ? pos + "º" : "-";
+  document.getElementById("fPatri").textContent = fmt(pt);
+  const luc = (pt / CAIXA_INICIAL - 1) * 100;
+  document.getElementById("fLucro").innerHTML = '<span class="' + (luc >= 0 ? "up" : "down") + '">' + pct(luc) + "</span>";
+}
+
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+// ----- operações -----
+async function comprarUma(t) {
+  let pago = null;
+  const r = await db.ref("acoes/" + t + "/preco").transaction(p => {
+    if (p === null) return; // aborta
+    pago = p; return r2(p * (1 + IMPACTO));
+  });
+  if (!r.committed || pago === null) return false;
+  const rr = await db.ref("jogadores/" + meuId).transaction(j => {
+    if (j === null) return; // aborta
+    if ((j.caixa || 0) < pago) return; // aborta: sem saldo
+    j.caixa = r2(j.caixa - pago);
+    j.carteira = j.carteira || {};
+    j.carteira[t] = (j.carteira[t] || 0) + 1;
+    return j;
+  });
+  if (!rr.committed) { // devolve o preço
+    await db.ref("acoes/" + t + "/preco").transaction(p => p === null ? p : r2(p / (1 + IMPACTO)));
+    return false;
+  }
+  db.ref("rodadas/" + estado.pregao.rodada + "/" + t + "/c").set(firebase.database.ServerValue.increment(1));
+  return true;
+}
+
+async function venderUma(t) {
+  const r = await db.ref("jogadores/" + meuId + "/carteira/" + t).transaction(q => {
+    if (q === null || q < 1) return; // aborta: não tem a ação
+    return q - 1;
+  });
+  if (!r.committed) return false;
+  let recebido = null;
+  await db.ref("acoes/" + t + "/preco").transaction(p => {
+    if (p === null) return;
+    recebido = p; return Math.max(1, r2(p * (1 - IMPACTO)));
+  });
+  await db.ref("jogadores/" + meuId + "/caixa").transaction(c => r2((c || 0) + (recebido || 0)));
+  db.ref("rodadas/" + estado.pregao.rodada + "/" + t + "/v").set(firebase.database.ServerValue.increment(1));
+  return true;
+}
+
+async function comprar(t, n) {
+  if (!pregaoAberto(estado)) return toast("Pregão fechado");
+  operando = true; renderStatus();
+  let ok = 0;
+  for (let i = 0; i < n; i++) { if (!pregaoAberto(estado)) break; if (await comprarUma(t)) ok++; else break; }
+  operando = false; renderStatus();
+  toast(ok ? "Comprou " + ok + " " + t : "Saldo insuficiente");
+}
+
+async function vender(t, n) {
+  if (!pregaoAberto(estado)) return toast("Pregão fechado");
+  const tem = (eu.carteira || {})[t] || 0;
+  if (!tem) return toast("Você não tem " + t);
+  operando = true; renderStatus();
+  let ok = 0;
+  for (let i = 0; i < Math.min(n, tem); i++) { if (!pregaoAberto(estado)) break; if (await venderUma(t)) ok++; else break; }
+  operando = false; renderStatus();
+  toast("Vendeu " + ok + " " + t);
+}
+</script>
+</body>
+</html>
