@@ -16,7 +16,7 @@ const CAIXA_INICIAL = 1000;   // IA$ que cada aluno recebe
 const IMPACTO = 0.015;        // cada ação comprada sobe o preço 1,5% (vendida: cai 1,5%)
 
 // ===== AÇÕES (fictícias, inspiradas nas empresas reais) =====
-// div = dividendo pago ao fim de cada pregão, sobre o valor da ação (maduras pagam mais, startups menos)
+// div = dividendo pago sempre que a bolsa fecha, sobre o valor da ação (maduras pagam mais, startups menos)
 const ACOES = {
   NVDA: { nome: "Nvidia",      pais: "EUA",     flag: "🇺🇸", setor: "Projeta os chips de IA",        preco: 120, div: 0.01 },
   TSM:  { nome: "TSMC",        pais: "Taiwan",  flag: "🇹🇼", setor: "Fabrica os chips",              preco: 100, div: 0.04 },
@@ -83,5 +83,5 @@ function patrimonio(j, acoes) {
 }
 function pregaoAberto(estado) {
   const p = estado && estado.pregao;
-  return !!(p && p.aberto && p.fimEm > agora());
+  return !!(p && p.aberto); // a bolsa abre/fecha pelo painel (sem tempo)
 }

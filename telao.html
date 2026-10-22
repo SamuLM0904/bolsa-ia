@@ -49,7 +49,7 @@
 <body>
 <header>
   <h1>📈 BOLSA DA <span>IA</span></h1>
-  <div id="status" class="fechado">🔒 PREGÃO FECHADO</div>
+  <div id="status" class="fechado">🔒 BOLSA FECHADA</div>
 </header>
 <div id="news">Aguardando a abertura do mercado…</div>
 <main>
@@ -109,8 +109,8 @@ db.ref("estado").on("value", s => {
 
 setInterval(() => {
   const el = document.getElementById("status"), p = estado.pregao || {};
-  if (pregaoAberto(estado)) { el.className = "aberto"; el.textContent = "🟢 PREGÃO ABERTO · " + Math.ceil((p.fimEm - agora()) / 1000) + "s"; }
-  else { el.className = "fechado"; el.textContent = "🔒 PREGÃO FECHADO"; }
+  if (pregaoAberto(estado)) { el.className = "aberto"; el.textContent = "🟢 BOLSA ABERTA · rodada " + p.rodada; }
+  else { el.className = "fechado"; el.textContent = "🔒 BOLSA FECHADA"; }
 }, 300);
 
 function spark(arr) {

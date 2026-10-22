@@ -80,7 +80,7 @@
 
 <div id="telaEntrar">
   <h1>📈 BOLSA DA <span>IA</span></h1>
-  <p class="mut" style="margin-top:6px">Você começa com IA$ 1.000. Compre e venda ações das empresas de IA. Preste atenção na apresentação: cada notícia mexe no mercado. Ao fim de cada pregão, suas ações pagam dividendos.</p>
+  <p class="mut" style="margin-top:6px">Você começa com IA$ 1.000. Compre e venda ações das empresas de IA. Preste atenção na apresentação: cada notícia mexe no mercado. Sempre que a bolsa fecha, suas ações pagam dividendos.</p>
   <div id="expulsoMsg" class="card aviso hidden">🚫 Você foi removido da sala pelo organizador.</div>
   <div class="card" id="cardEntrar">
     <input id="nome" maxlength="18" placeholder="Seu nome (ou apelido)" autocomplete="off">
@@ -98,13 +98,13 @@
     </div>
     <button class="cfgBtn" onclick="abrirCfg()" aria-label="Configurações">⚙️</button>
   </div>
-  <div id="status" class="status fechado">🔒 PREGÃO FECHADO</div>
+  <div id="status" class="status fechado">🔒 BOLSA FECHADA</div>
   <div id="noticia" class="card news hidden"></div>
   <div id="lista"></div>
 </div>
 
 <div id="telaFinal" class="hidden final">
-  <h1>🏁 FIM DO PREGÃO</h1>
+  <h1>🏁 BOLSA ENCERRADA</h1>
   <div class="pos" id="fPos">-</div>
   <div class="mut">sua posição no ranking</div>
   <div class="card"><div class="mut">Patrimônio final</div><b id="fPatri" style="font-size:24px">-</b><div id="fLucro"></div></div>
@@ -257,10 +257,9 @@ function renderStatus() {
   const el = document.getElementById("status");
   const p = estado.pregao || {};
   if (pregaoAberto(estado)) {
-    const seg = Math.max(0, Math.ceil((p.fimEm - agora()) / 1000));
-    el.className = "status aberto"; el.textContent = "🟢 PREGÃO ABERTO · " + seg + "s · rodada " + p.rodada;
+    el.className = "status aberto"; el.textContent = "🟢 BOLSA ABERTA · rodada " + p.rodada;
   } else {
-    el.className = "status fechado"; el.textContent = "🔒 PREGÃO FECHADO · aguarde a próxima rodada";
+    el.className = "status fechado"; el.textContent = "🔒 BOLSA FECHADA · aguarde a próxima rodada";
   }
   document.querySelectorAll(".buy,.sell").forEach(b => b.disabled = operando || !pregaoAberto(estado));
 }
@@ -371,7 +370,7 @@ async function venderUma(t) {
 }
 
 async function comprar(t, n) {
-  if (!pregaoAberto(estado)) return toast("Pregão fechado");
+  if (!pregaoAberto(estado)) return toast("Bolsa fechada");
   operando = true; renderStatus();
   let ok = 0;
   for (let i = 0; i < n; i++) { if (!pregaoAberto(estado)) break; if (await comprarUma(t)) ok++; else break; }
@@ -380,7 +379,7 @@ async function comprar(t, n) {
 }
 
 async function vender(t, n) {
-  if (!pregaoAberto(estado)) return toast("Pregão fechado");
+  if (!pregaoAberto(estado)) return toast("Bolsa fechada");
   const tem = (eu.carteira || {})[t] || 0;
   if (!tem) return toast("Você não tem " + t);
   operando = true; renderStatus();

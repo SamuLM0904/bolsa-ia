@@ -26,6 +26,12 @@
   input { width:100%; padding:9px; border-radius:8px; border:1px solid var(--line); background:#0f151d; color:var(--txt); margin-bottom:6px; font-size:14px; }
   .mini button { padding:5px 8px; font-size:12px; margin:1px; }
   .hidden { display:none; }
+  /* interruptor abre/fecha a bolsa */
+  .sw { display:flex; align-items:center; gap:12px; background:transparent; padding:6px 0; margin:0; font-size:16px; }
+  .sw .trilho { position:relative; width:58px; height:32px; border-radius:16px; background:#475569; transition:background .2s; flex:none; }
+  .sw .bola { position:absolute; top:4px; left:4px; width:24px; height:24px; border-radius:50%; background:#fff; transition:transform .2s; box-shadow:0 1px 3px rgba(0,0,0,.4); }
+  .sw[aria-checked="true"] .trilho { background:var(--up); }
+  .sw[aria-checked="true"] .bola { transform:translateX(26px); }
   .efx .lin { padding:6px 0; border-bottom:1px solid var(--line); }
   .efx .top { display:flex; justify-content:space-between; font-size:14px; }
   .efx .top b.val { min-width:56px; text-align:right; }
@@ -43,20 +49,17 @@
 
 <div class="grid">
   <div class="card">
-    <h2>Pregão</h2>
-    <div id="status" class="status fechado">FECHADO</div>
+    <h2>Bolsa</h2>
+    <div id="status" class="status fechado">🔒 FECHADA</div>
     <div>Rodada atual: <b id="rodada">0</b> · Jogadores: <b id="nJog">0</b></div>
     <div style="margin-top:8px">
-      <button class="g" onclick="abrir(45)">Abrir 45s</button>
-      <button class="g" onclick="abrir(60)">Abrir 60s</button>
-      <button class="g" onclick="abrir(90)">Abrir 90s</button>
-      <button class="r" onclick="fechar()">Fechar agora</button>
+      <button id="btnPregao" class="sw" role="switch" aria-checked="false" onclick="alternarPregao()"><span class="trilho"><span class="bola"></span></span><span id="swTxt">Bolsa fechada</span></button>
     </div>
     <h2 style="margin-top:14px">Telão</h2>
     <button class="b" onclick="toggle('qr')">QR Code grande: <span id="qrSt">-</span></button>
     <button class="b" onclick="toggle('final')">Resultado final: <span id="finalSt">-</span></button>
     <button class="y" onclick="dividendos()">💰 Dividendos extras</button>
-    <p class="mut">Dividendos são pagos sozinhos ao fechar cada pregão.</p>
+    <p class="mut">Dividendos são pagos sozinhos sempre que a bolsa fecha.</p>
     <div><button class="b" onclick="toggleJog()">👥 <span id="jogBtn">Mostrar jogadores</span></button></div>
     <div id="listaJog" class="hidden">
       <table id="tabJog" style="margin-top:8px"></table>
@@ -143,12 +146,14 @@ let expulsos = {}, verJog = false;
 db.ref("expulsos").on("value", s => { expulsos = s.val() || {}; renderJog(); });
 
 setInterval(() => {
-  const p = estado.pregao || {};
-  const el = document.getElementById("status");
-  if (p.aberto && p.fimEm <= agora()) { fechar(); }
+  const el = document.getElementById("status"), b = document.getElementById("btnPregao");
   if (pregaoAberto(estado)) {
-    el.className = "status aberto"; el.textContent = "🟢 ABERTO · " + Math.ceil((p.fimEm - agora()) / 1000) + "s";
-  } else { el.className = "status fechado"; el.textContent = "🔒 FECHADO"; }
+    el.className = "status aberto"; el.textContent = "🟢 ABERTA";
+    b.setAttribute("aria-checked", "true"); document.getElementById("swTxt").textContent = "Bolsa aberta";
+  } else {
+    el.className = "status fechado"; el.textContent = "🔒 FECHADA";
+    b.setAttribute("aria-checked", "false"); document.getElementById("swTxt").textContent = "Bolsa fechada";
+  }
 }, 300);
 
 function render() {
@@ -213,9 +218,11 @@ function renderJog() {
 function esc(s) { return String(s || "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 
 // ----- ações do controlador -----
-function abrir(seg) {
+function alternarPregao() { if (pregaoAberto(estado)) fechar(); else abrir(); }
+function abrir() {
   const r = ((estado.pregao && estado.pregao.rodada) || 0) + 1;
-  db.ref("estado/pregao").set({ aberto: true, fimEm: agora() + seg * 1000, rodada: r });
+  // fimEm distante (12 h): abas antigas do painel, que fecham quando o tempo acaba, não fecham a bolsa sozinhas
+  db.ref("estado/pregao").set({ aberto: true, fimEm: agora() + 12 * 3600 * 1000, rodada: r });
 }
 function fechar() {
   const p = estado.pregao || {};
